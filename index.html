@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Top Ten — Online Rooms</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/mqtt@5.15.2/dist/mqtt.min.js"></script>
+<style>
+  :root{
+    --bg1:#2a1259; --bg2:#43156b; --bg3:#7a1f6e;
+    --surface:rgba(255,255,255,0.08); --card:#ffffff; --ink:#2a1450;
+    --text:#fff6ec; --muted:#cbb9ec;
+    --pink:#ff5d8f; --yellow:#ffc93c; --aqua:#3dd6c4; --blue:#5b8def;
+    --radius:30px; --radius-sm:18px; --shadow:0 22px 50px -20px rgba(0,0,0,.55);
+    --font-display:'Fredoka',-apple-system,'Segoe UI',system-ui,sans-serif;
+    --font-body:'Nunito',-apple-system,'Segoe UI',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{margin:0;font-family:var(--font-body);color:var(--text);
+    background:radial-gradient(120% 80% at 15% 0%, #ff5d8f22 0%, transparent 45%),
+      radial-gradient(110% 90% at 100% 100%, #3dd6c422 0%, transparent 50%),
+      linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 55%, var(--bg3) 100%);
+    min-height:100dvh;display:flex;align-items:flex-start;justify-content:center;
+    overflow-x:hidden;padding:22px 18px 48px;}
+  .blob{position:fixed;border-radius:50%;filter:blur(42px);opacity:.32;z-index:0;pointer-events:none;animation:float 15s ease-in-out infinite;}
+  .blob.b1{width:260px;height:260px;background:#ff5d8f;top:-70px;left:-60px;}
+  .blob.b2{width:220px;height:220px;background:#3dd6c4;bottom:-60px;right:-40px;animation-delay:-5s;}
+  .blob.b3{width:180px;height:180px;background:#ffc93c;top:42%;right:-70px;animation-delay:-9s;}
+  @keyframes float{0%,100%{transform:translate(0,0) scale(1);}50%{transform:translate(0,-26px) scale(1.08);}}
+  .stage{position:relative;z-index:1;width:100%;max-width:460px;margin:0 auto;}
+  .brand{text-align:center;margin:6px 0 18px;}
+  .brand .logo{font-family:var(--font-display);font-weight:700;line-height:.92;font-size:clamp(40px,13vw,60px);letter-spacing:-1px;display:inline-block;}
+  .brand .logo .top{display:block;color:var(--text);}
+  .brand .logo .ten{display:inline-block;background:linear-gradient(100deg,var(--yellow),var(--pink) 55%,var(--aqua));-webkit-background-clip:text;background-clip:text;color:transparent;transform:rotate(-3deg);}
+  .brand .tag{margin-top:8px;color:var(--muted);font-weight:700;font-size:14px;}
+  .card{background:var(--card);color:var(--ink);border-radius:var(--radius);padding:24px 22px;box-shadow:var(--shadow);}
+  .glass{background:var(--surface);border:1px solid rgba(255,255,255,.14);border-radius:var(--radius);padding:22px;backdrop-filter:blur(6px);}
+  h2.section{font-family:var(--font-display);font-weight:600;font-size:21px;margin:0 0 4px;color:var(--ink);}
+  .hint{color:#7a6a95;font-size:13.5px;font-weight:600;margin:0 0 16px;line-height:1.45;}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;cursor:pointer;font-family:var(--font-display);font-weight:600;font-size:19px;padding:17px 20px;border-radius:20px;color:#fff;background:linear-gradient(100deg,var(--pink),#ff7a53);box-shadow:0 14px 26px -12px #ff5d8fcc;transition:transform .08s ease;}
+  .btn:active{transform:scale(.97);}
+  .btn.big{font-size:21px;padding:20px;}
+  .btn.aqua{background:linear-gradient(100deg,var(--aqua),#37b8e6);box-shadow:0 14px 26px -12px #3dd6c4cc;}
+  .btn.ghost{background:rgba(255,255,255,.1);color:var(--text);box-shadow:none;border:1.5px solid rgba(255,255,255,.22);}
+  .btn.soft{background:#f2ecfb;color:#6b4b9e;box-shadow:none;}
+  .btn.tiny{font-size:15px;padding:12px 16px;border-radius:14px;}
+  .btn:disabled{opacity:.45;cursor:default;}
+  .stack{display:flex;flex-direction:column;gap:11px;margin-top:16px;}
+  .field{margin-bottom:13px;}
+  .field label{display:block;font-family:var(--font-display);font-weight:600;font-size:14px;color:var(--ink);margin-bottom:6px;}
+  .field input{width:100%;border:2px solid #ece6f5;background:#faf8fe;border-radius:14px;padding:13px 14px;font-family:var(--font-body);font-weight:700;font-size:16px;color:var(--ink);}
+  .field input:focus{outline:none;border-color:var(--pink);background:#fff;}
+  .field input.code{text-transform:uppercase;letter-spacing:4px;font-family:var(--font-display);font-weight:600;text-align:center;font-size:24px;}
+  .link{background:none;border:none;color:var(--muted);font-family:var(--font-body);font-weight:800;font-size:13.5px;cursor:pointer;padding:8px 4px;}
+  .link:active{color:var(--text);}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;}
+  .statuspill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:var(--text);font-weight:800;font-size:12px;padding:6px 11px;border-radius:999px;}
+  .sdot{width:9px;height:9px;border-radius:50%;}
+  .connecting .sdot{animation:pulse 1s infinite;}
+  @keyframes pulse{50%{opacity:.3;}}
+  .setup-error{color:#e0446b;font-weight:800;font-size:13.5px;margin:12px 2px 0;background:#ffeef3;padding:10px 12px;border-radius:12px;}
+  /* room code */
+  .roomwrap{text-align:center;margin:2px 0 8px;}
+  .roomwrap .rc-eye{font-family:var(--font-display);font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--pink);font-size:11px;}
+  .roomcode{font-family:var(--font-display);font-weight:700;font-size:clamp(46px,16vw,64px);letter-spacing:8px;color:var(--ink);line-height:1;margin:4px 0 6px;}
+  .copyrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:4px;}
+  .copybtn{background:#f2ecfb;color:#6b4b9e;border:none;border-radius:12px;font-family:var(--font-body);font-weight:800;font-size:13px;padding:9px 14px;cursor:pointer;}
+  .copybtn:active{transform:scale(.96);}
+  /* roster */
+  .modelabel{font-family:var(--font-display);font-weight:600;font-size:15px;color:var(--ink);margin:18px 0 9px;}
+  .roster{display:flex;flex-direction:column;gap:9px;}
+  .rr{display:flex;align-items:center;gap:11px;background:#f7f4fc;border-radius:15px;padding:10px 13px;}
+  .rr.narr{background:#fff6e0;}
+  .rr .av{width:34px;height:34px;flex:0 0 34px;border-radius:11px;display:grid;place-items:center;color:#fff;font-family:var(--font-display);font-weight:700;font-size:15px;}
+  .rr .nm{flex:1;font-weight:800;font-size:16px;color:var(--ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rr .tag{font-size:11px;font-weight:800;color:#b07d16;background:#ffe6a8;padding:3px 8px;border-radius:999px;}
+  .rr .mic,.rr .kill{flex:0 0 38px;width:38px;height:38px;border:none;border-radius:11px;cursor:pointer;font-size:16px;line-height:1;}
+  .rr .mic{background:#efe7fb;filter:grayscale(1);opacity:.5;}
+  .rr .mic.on{background:#fff0c6;filter:none;opacity:1;}
+  .rr .kill{background:#f3eefa;color:#c98aa8;font-size:19px;font-weight:800;}
+  .empty{color:#9a8ab5;font-weight:700;font-size:14px;text-align:center;padding:14px;}
+  .chips{display:grid;gap:9px;}
+  .chip{display:flex;align-items:center;gap:11px;width:100%;text-align:left;cursor:pointer;border:2px solid #ece6f5;background:#faf8fe;border-radius:15px;padding:12px 14px;font-family:var(--font-body);font-weight:800;font-size:15px;color:var(--ink);}
+  .chip .emo{font-size:20px;}
+  .chip .sub{display:block;font-weight:700;font-size:12px;color:#8a77aa;margin-top:1px;}
+  .chip.active{border-color:var(--pink);background:#fff0f5;}
+  .chip .txt{flex:1;}
+  .chip .tick{opacity:0;font-weight:900;color:var(--pink);}
+  .chip.active .tick{opacity:1;}
+  .note{background:#f4f0fb;border-radius:14px;padding:11px 13px;color:#7a6a95;font-weight:700;font-size:12.5px;margin-top:14px;line-height:1.4;}
+  /* theme peek */
+  .themepeek{background:#f7f4fc;border-radius:16px;padding:13px 15px;margin:14px 0;text-align:left;}
+  .themepeek .tp-eye{font-family:var(--font-display);font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--pink);font-size:10.5px;}
+  .themepeek .tp-sc{font-weight:800;font-size:16px;margin-top:3px;color:var(--ink);line-height:1.25;}
+  .themepeek .tp-anch{display:flex;gap:14px;margin-top:8px;font-size:12.5px;font-weight:700;color:#8a77aa;flex-wrap:wrap;}
+  .themepeek .tp-anch b{color:var(--ink);}
+  /* number card */
+  .reveal{text-align:center;}
+  .numcard{border-radius:34px;padding:38px 20px 32px;color:#fff;position:relative;overflow:hidden;box-shadow:0 26px 50px -18px rgba(0,0,0,.5);animation:flipin .5s cubic-bezier(.2,.9,.3,1.2) both;}
+  @keyframes flipin{0%{transform:perspective(700px) rotateY(90deg) scale(.9);opacity:0;}100%{transform:perspective(700px) rotateY(0) scale(1);opacity:1;}}
+  .numcard .who{font-family:var(--font-display);font-weight:600;font-size:16px;opacity:.9;}
+  .numcard .big{font-family:var(--font-display);font-weight:700;font-size:clamp(110px,40vw,170px);line-height:.9;margin:4px 0;text-shadow:0 6px 0 rgba(0,0,0,.12);}
+  .numcard .scale-tag{font-weight:800;font-size:14px;opacity:.92;}
+  .numcard.is10{box-shadow:0 0 0 4px #ffd75e,0 26px 50px -14px #ff4d4dcc;}
+  .numcard .crown{font-size:26px;margin-bottom:-4px;}
+  .narrcard{background:linear-gradient(160deg,#ffca3a,#ff8a3d);}
+  .revealhint{color:var(--muted);font-weight:700;font-size:13px;margin:15px 6px 0;line-height:1.4;}
+  .ready{text-align:center;}
+  .party{font-size:44px;margin-bottom:4px;}
+  .ready h2{font-family:var(--font-display);font-weight:700;font-size:25px;color:var(--text);margin:0 0 6px;}
+  .ready p{color:var(--muted);font-weight:700;font-size:14px;margin:0 0 6px;line-height:1.4;}
+  .resultlist{display:flex;flex-direction:column;gap:9px;margin:8px 0 4px;}
+  .rrow{display:flex;align-items:center;gap:13px;background:#f7f4fc;border-radius:16px;padding:11px 14px;text-align:left;animation:pop .35s ease both;}
+  @keyframes pop{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+  .rrow .rn{width:44px;height:44px;flex:0 0 44px;border-radius:13px;display:grid;place-items:center;font-family:var(--font-display);font-weight:700;color:#fff;font-size:22px;}
+  .rrow .rname{font-weight:800;font-size:17px;color:var(--ink);}
+  .narrbanner{display:inline-block;background:linear-gradient(100deg,#ffe8a3,#ffd0a3);color:#8a5a12;font-family:var(--font-display);font-weight:600;font-size:14px;padding:8px 15px;border-radius:999px;margin:4px 0 8px;}
+  .waitbox{text-align:center;padding:8px 4px;}
+  .waitbox .spin{width:44px;height:44px;border-radius:50%;border:4px solid rgba(255,255,255,.2);border-top-color:var(--yellow);margin:10px auto 16px;animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .waitbox h2{font-family:var(--font-display);font-weight:700;color:var(--text);font-size:22px;margin:6px 0;}
+  .waitbox p{color:var(--muted);font-weight:700;font-size:14px;line-height:1.4;}
+  .foot{text-align:center;color:rgba(255,255,255,.4);font-weight:700;font-size:12px;margin-top:18px;line-height:1.5;}
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#2a1450;color:#fff;font-weight:800;font-size:14px;padding:12px 18px;border-radius:14px;z-index:80;box-shadow:0 10px 30px rgba(0,0,0,.4);opacity:0;transition:opacity .2s;}
+  .toast.show{opacity:1;}
+  @media (prefers-reduced-motion: reduce){.blob,.numcard,.rrow,.spin{animation:none;}}
+</style>
+</head>
+<body>
+  <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div class="stage" id="app"></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  var BROKERS=["wss://broker.emqx.io:8084/mqtt","wss://broker.hivemq.com:8884/mqtt"];
+  var ROOT="ttx1"; // topic root / protocol version
+
+  var NUM_COLORS={1:"#22c3e6",2:"#22a8e6",3:"#3e8ee8",4:"#6e77ea",5:"#9866e6",6:"#c457d6",7:"#e85aa6",8:"#ff6f6f",9:"#ff8a3d",10:"#ff4d4d"};
+  var THEMES=[
+    {s:"Your excitement level",lo:"Meh, whatever\u2026",hi:"BEST DAY OF MY LIFE!!!"},
+    {s:"How dangerous is this idea",lo:"Completely safe",hi:"Someone's calling an ambulance"},
+    {s:"How spicy is this dish",lo:"Plain white rice",hi:"Melting your face off"},
+    {s:"How awkward is this moment",lo:"No big deal",hi:"Must move to another country"},
+    {s:"How much did you just spend",lo:"Some loose change",hi:"Your entire life savings"},
+    {s:"How scary is this movie",lo:"A cute cartoon",hi:"Can't sleep for a week"},
+    {s:"How fancy is this restaurant",lo:"A gas-station snack",hi:"Michelin stars everywhere"},
+    {s:"How tired are you",lo:"Fully charged",hi:"Asleep mid-sentence"},
+    {s:"How illegal is this",lo:"Perfectly legal",hi:"An international incident"},
+    {s:"How loud is this sound",lo:"A tiny whisper",hi:"A rocket launch"},
+    {s:"How romantic is this gesture",lo:"A nod across the room",hi:"Fireworks and an orchestra"},
+    {s:"How weird is your neighbor",lo:"Perfectly normal",hi:"Definitely an alien"},
+    {s:"How much do you regret it",lo:"Zero regrets",hi:"Haunts you at 3am"},
+    {s:"How hot is it outside",lo:"Crisp and cool",hi:"Surface of the sun"},
+    {s:"How risky is that text to your crush",lo:"Totally chill",hi:"Throw the phone in the ocean"},
+    {s:"How strong is this coffee",lo:"Basically water",hi:"You can see through time"},
+    {s:"How chaotic is this party",lo:"Quiet board games",hi:"The neighbors called the police"},
+    {s:"How rare is this talent",lo:"Everyone can do it",hi:"One in a billion"},
+    {s:"How extreme is this sport",lo:"A gentle stroll",hi:"Jumping out of a plane"},
+    {s:"How cursed is this snack combo",lo:"Surprisingly fine",hi:"Absolutely unholy"},
+    {s:"How famous is this person",lo:"Nobody knows them",hi:"Known on every planet"},
+    {s:"How dramatic is your exit",lo:"A quiet wave",hi:"Slammed doors and a monologue"},
+    {s:"How messy is your room",lo:"Absolutely spotless",hi:"Archaeologists required"},
+    {s:"How ambitious is this plan",lo:"Take a nap",hi:"Take over the world"},
+    {s:"How suspicious is this behavior",lo:"Totally innocent",hi:"Clearly hiding a secret"},
+    {s:"How magical is this place",lo:"An empty parking lot",hi:"Pure fairytale wonder"},
+    {s:"How competitive are you",lo:"Just here for fun",hi:"Will win at any cost"},
+    {s:"How luxurious is this trip",lo:"Sleeping in the car",hi:"Private island paradise"},
+    {s:"How embarrassing was that fall",lo:"Nobody noticed",hi:"Caught on ten cameras"},
+    {s:"How intense is your morning routine",lo:"Roll out of bed",hi:"A two-hour production"}
+  ];
+
+  // ---------- identity + persistence ----------
+  function myId(){
+    try{ var k=localStorage.getItem("ttx_id"); if(!k){ k="u"+Math.random().toString(36).slice(2,8)+Date.now().toString(36).slice(-3); localStorage.setItem("ttx_id",k);} return k; }
+    catch(e){ if(!window._cid) window._cid="u"+Math.random().toString(36).slice(2,10); return window._cid; }
+  }
+  function saveSession(o){ try{ o?localStorage.setItem("ttx_sess",JSON.stringify(o)):localStorage.removeItem("ttx_sess"); }catch(e){} }
+  function loadSession(){ try{ return JSON.parse(localStorage.getItem("ttx_sess")||"null"); }catch(e){ return null; } }
+
+  // ---------- app state ----------
+  var A={
+    role:null, screen:"landing", conn:"idle", room:null,
+    client:null, everConnected:false, brokerIdx:0,
+    state:null,               // authoritative on host, mirror on player
+    themeMode:"builtin",      // host draft
+    draft:{s:"",lo:"",hi:""}, // custom theme draft
+    myName:"", err:"", joinRoom:"", _to:null, _hostInit:null
+  };
+  var app=document.getElementById("app");
+
+  function esc(t){return String(t==null?"":t).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];});}
+  function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+  function randCode(){ var s="ABCDEFGHJKMNPQRSTUVWXYZ23456789",o=""; for(var i=0;i<4;i++)o+=s[Math.floor(Math.random()*s.length)]; return o; }
+  function stateTopic(){ return ROOT+"/"+A.room+"/state"; }
+  function evTopic(){ return ROOT+"/"+A.room+"/ev"; }
+  function findPlayer(id){ if(!A.state)return null; for(var i=0;i<A.state.players.length;i++) if(A.state.players[i].id===id) return A.state.players[i]; return null; }
+  function activePlayers(){ return A.state.players.filter(function(p){return p.id!==A.state.narratorId;}); }
+  function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove("show");},1600); }
+
+  // ---------- connection ----------
+  function ensureMqtt(cb){
+    if(window.mqtt) return cb();
+    var n=0;
+    (function poll(){
+      if(window.mqtt) return cb();
+      if(n===8){ var s=document.createElement("script"); s.src="https://cdn.jsdelivr.net/npm/mqtt@5.15.2/dist/mqtt.min.js"; s.onload=function(){cb();}; s.onerror=function(){ A.err="Couldn't load the connection library \u2014 check your internet and refresh."; render(); }; document.head.appendChild(s); }
+      if(n>40){ A.err="Couldn't load the connection library \u2014 check your internet and refresh."; render(); return; }
+      n++; setTimeout(poll,150);
+    })();
+  }
+
+  function connect(){
+    ensureMqtt(function(){
+      clearTimeout(A._to);
+      var url=BROKERS[A.brokerIdx%BROKERS.length];
+      A.conn="connecting"; render();
+      var c;
+      try{ c=mqtt.connect(url,{clientId:"tt_"+myId()+"_"+Math.random().toString(16).slice(2,6),clean:true,reconnectPeriod:3000,connectTimeout:8000,keepalive:45}); }
+      catch(e){ A.brokerIdx++; setTimeout(connect,400); return; }
+      A.client=c;
+      A._to=setTimeout(function(){ if(A.conn!=="online" && !A.everConnected){ try{c.end(true);}catch(e){} A.brokerIdx++; connect(); } },9000);
+      c.on("connect",function(){ clearTimeout(A._to); onConnect(); });
+      c.on("message",onMessage);
+      c.on("close",function(){ if(A.conn==="online"){ A.conn="offline"; render(); } });
+      c.on("reconnect",function(){ if(A.conn!=="online"){ A.conn="connecting"; render(); } });
+      c.on("error",function(){});
+    });
+  }
+
+  function onConnect(){
+    A.everConnected=true; A.conn="online";
+    A.client.subscribe(stateTopic(),{qos:1});
+    if(A.role==="host"){
+      A.client.subscribe(evTopic(),{qos:1});
+      // wait briefly for retained state (resume); if none, initialise
+      A._hostInit=setTimeout(function(){ if(!A.state){ A.state=blankState(); publishState(); } else { render(); } },1400);
+    } else {
+      sendEv({t:"join",id:myId(),name:A.myName});
+      ensureJoined(0);
+    }
+    render();
+  }
+
+  function blankState(){ return {v:0,phase:"lobby",theme:null,narratorId:null,round:0,players:[],deal:{}}; }
+
+  function publishState(){
+    if(!A.client||A.role!=="host") return;
+    A.state.v=(A.state.v||0)+1;
+    A.client.publish(stateTopic(),JSON.stringify(A.state),{qos:1,retain:true});
+    render();
+  }
+  function sendEv(o){ if(A.client) A.client.publish(evTopic(),JSON.stringify(o),{qos:1}); }
+
+  function ensureJoined(tries){
+    if(A.role!=="player"||tries>3) return;
+    setTimeout(function(){
+      if(A.role==="player" && A.client && (!A.state || !findPlayer(myId()))){ sendEv({t:"join",id:myId(),name:A.myName}); ensureJoined(tries+1); }
+    },2500);
+  }
+
+  function onMessage(topic,payload){
+    var msg; try{ msg=JSON.parse(payload.toString()); }catch(e){ return; }
+    if(topic===stateTopic()){
+      if(A.role==="host"){
+        if(!A.state){ A.state=msg; clearTimeout(A._hostInit); render(); } // adopt retained on resume
+        // otherwise ignore (we are the authority; this is our echo)
+      } else { A.state=msg; render(); }
+    } else if(topic===evTopic() && A.role==="host"){
+      handleEvent(msg);
+    }
+  }
+
+  function handleEvent(m){
+    if(!A.state) return;
+    if(m.t==="join"){
+      var p=findPlayer(m.id);
+      if(p){ if(m.name) p.name=m.name; } else { A.state.players.push({id:m.id,name:(m.name||"Player")}); }
+      publishState();
+    } else if(m.t==="rename"){ var q=findPlayer(m.id); if(q){ q.name=m.name; publishState(); } }
+    else if(m.t==="bye"){ A.state.players=A.state.players.filter(function(p){return p.id!==m.id;}); if(A.state.narratorId===m.id)A.state.narratorId=null; publishState(); }
+  }
+
+  // ---------- host actions ----------
+  function hostCreate(){
+    A.role="host"; A.room=randCode(); A.state=null; A.everConnected=false; A.brokerIdx=0;
+    saveSession({role:"host",room:A.room});
+    location.hash=A.room; connect();
+  }
+  function hostDeal(){
+    if(A.themeMode==="custom"){ A.draft={s:"",lo:"",hi:""}; A.screen="customform"; render(); return; }
+    finalizeDeal();
+  }
+  function finalizeDeal(){
+    var active=activePlayers();
+    if(active.length<2){ A.err="Need at least 2 players with numbers"+(A.state.narratorId?" besides the narrator.":"."); toast(A.err); render(); return; }
+    if(active.length>10){ A.err="Only 10 numbers exist \u2014 remove a player or set a narrator."; toast(A.err); render(); return; }
+    A.err="";
+    var pool=shuffle([1,2,3,4,5,6,7,8,9,10]); var deal={};
+    active.forEach(function(p,i){ deal[p.id]=pool[i]; });
+    if(A.themeMode==="builtin") A.state.theme=THEMES[Math.floor(Math.random()*THEMES.length)];
+    else if(A.themeMode==="none") A.state.theme=null;
+    // custom theme already placed in A.state.theme by the form
+    A.state.deal=deal; A.state.phase="dealt"; A.state.round=(A.state.round||0)+1;
+    A.screen="host"; publishState();
+  }
+
+  // ---------- player actions ----------
+  function playerJoin(room,name){
+    A.role="player"; A.room=room; A.myName=name; A.everConnected=false; A.brokerIdx=0; A.state=null;
+    saveSession({role:"player",room:room,name:name});
+    connect();
+  }
+  function leaveAll(){
+    try{ if(A.role==="player") sendEv({t:"bye",id:myId()}); }catch(e){}
+    try{ if(A.client) A.client.end(true); }catch(e){}
+    saveSession(null); location.hash="";
+    A.role=null; A.client=null; A.state=null; A.room=null; A.conn="idle"; A.everConnected=false; A.err=""; A.screen="landing"; render();
+  }
+
+  function copyLink(){
+    var url=location.origin+location.pathname+"#"+A.room;
+    try{ navigator.clipboard.writeText(url).then(function(){toast("Link copied");},function(){toast(url);}); }
+    catch(e){ toast(url); }
+  }
+  function copyCode(){ try{ navigator.clipboard.writeText(A.room).then(function(){toast("Code copied");},function(){toast(A.room);}); }catch(e){ toast(A.room); } }
+
+  // ============ RENDER ============
+  function render(){
+    var s=A.screen;
+    if(A.role===null){ app.innerHTML=(s==="joinform")?viewJoinForm():viewLanding(); return; }
+    if(A.conn==="connecting" && !A.state){ app.innerHTML=viewConnecting(); return; }
+    if(A.role==="host"){
+      if(!A.state){ app.innerHTML=viewConnecting(); return; }
+      if(A.screen==="customform"){ app.innerHTML=viewCustomForm(); return; }
+      if(A.screen==="narrpick"){ app.innerHTML=viewNarrPick(); return; }
+      if(A.state.phase==="lobby") app.innerHTML=viewHostLobby();
+      else if(A.state.phase==="reveal") app.innerHTML=viewReveal(true);
+      else app.innerHTML=viewHostDealt();
+    } else { // player
+      if(!A.state){ app.innerHTML=viewConnecting(); return; }
+      if(A.state.phase==="reveal"){ app.innerHTML=viewReveal(false); return; }
+      app.innerHTML=viewPlayer();
+    }
+  }
+
+  function brand(){ return '<div class="brand"><div class="logo"><span class="top">TOP</span><span class="ten">TEN</span></div><div class="tag">Online rooms \u2014 one number each</div></div>'; }
+  function statusPill(){
+    var map={online:["#2ecc71","Connected"],connecting:["#ffc93c","Connecting\u2026"],offline:["#ff6b6b","Reconnecting\u2026"],idle:["#999","Offline"]};
+    var m=map[A.conn]||map.idle;
+    return '<div class="statuspill '+(A.conn==="connecting"?"connecting":"")+'"><span class="sdot" style="background:'+m[0]+'"></span>'+m[1]+(A.room?" \u00b7 "+A.room:"")+'</div>';
+  }
+  function errBlock(){ return A.err?'<p class="setup-error">\u26a0\ufe0f '+esc(A.err)+'</p>':""; }
+
+  function viewLanding(){
+    var sess=loadSession();
+    var resume=sess?'<button class="btn soft" data-resume>\u21ba Resume room '+esc(sess.room)+'</button>':"";
+    return brand()+
+    '<div class="card">'+
+      '<h2 class="section">Play across phones</h2>'+
+      '<p class="hint">One person hosts and runs the game. Everyone else joins with a 4-letter code \u2014 from anywhere. Each phone shows only its own number.</p>'+
+      errBlock()+
+      '<div class="stack">'+
+        '<button class="btn big" data-create>Create a room</button>'+
+        '<button class="btn aqua" data-join>Join a room</button>'+
+        resume+
+      '</div>'+
+    '</div>'+
+    '<div class="foot">Free public server \u00b7 no accounts \u00b7 numbers are hidden from other players (a party-game level of secret, not a bank).</div>';
+  }
+
+  function viewJoinForm(){
+    var pre=A.joinRoom||((location.hash||"").replace("#","").toUpperCase());
+    var sess=loadSession();
+    var preName=A.myName||(sess&&sess.name)||"";
+    return brand()+
+    '<div class="topbar"><button class="link" data-landing>\u2039 Back</button>'+(A.conn!=="idle"?statusPill():"")+'</div>'+
+    '<div class="card">'+
+      '<h2 class="section">Join a room</h2>'+
+      '<p class="hint">Ask the host for the 4-letter code.</p>'+
+      '<div class="field"><label>Room code</label><input class="code" data-f="room" maxlength="4" value="'+esc(pre)+'" placeholder="ABCD" autocapitalize="characters" /></div>'+
+      '<div class="field"><label>Your name</label><input data-f="name" maxlength="18" value="'+esc(preName)+'" placeholder="e.g. Alex" /></div>'+
+      errBlock()+
+      '<div class="stack"><button class="btn big" data-dojoin>Join \u2192</button></div>'+
+    '</div>';
+  }
+
+  function viewConnecting(){
+    return brand()+
+    '<div class="topbar"><button class="link" data-leave>\u2039 Leave</button>'+statusPill()+'</div>'+
+    '<div class="glass waitbox"><div class="spin"></div>'+
+      '<h2>'+(A.role==="host"?"Opening your room\u2026":"Joining "+esc(A.room||"")+"\u2026")+'</h2>'+
+      '<p>Connecting to the game server. This is usually quick; if it hangs, we\u2019ll try a backup server automatically.</p>'+
+      errBlock()+
+    '</div>';
+  }
+
+  function avatar(i){ var ACC=["#ff5d8f","#ffc93c","#3dd6c4","#5b8def","#c457d6","#ff8a3d","#22c3e6","#e85aa6"]; return ACC[i%ACC.length]; }
+
+  function rosterRows(editable){
+    if(!A.state.players.length) return '<div class="empty">No one has joined yet\u2026 share the code!</div>';
+    return A.state.players.map(function(p,i){
+      var isN=p.id===A.state.narratorId;
+      var me=p.id===myId()?" (you)":"";
+      return '<div class="rr'+(isN?" narr":"")+'">'+
+        '<div class="av" style="background:'+(isN?"linear-gradient(135deg,#ffca3a,#ff8a3d)":avatar(i))+'">'+(isN?"\ud83c\udf99\ufe0f":esc((p.name||"?").slice(0,1).toUpperCase()))+'</div>'+
+        '<div class="nm">'+esc(p.name)+me+'</div>'+
+        (isN?'<span class="tag">narrator</span>':"")+
+        (editable?'<button class="mic'+(isN?" on":"")+'" data-narr="'+p.id+'" title="Narrator">\ud83c\udf99\ufe0f</button><button class="kill" data-remove="'+p.id+'">\u00d7</button>':"")+
+      '</div>';
+    }).join("");
+  }
+
+  function themePeek(){
+    if(!A.state.theme) return "";
+    return '<div class="themepeek"><div class="tp-eye">This round\u2019s scale</div><div class="tp-sc">'+esc(A.state.theme.s)+'</div>'+
+      '<div class="tp-anch"><span>1 = <b>'+esc(A.state.theme.lo)+'</b></span><span>10 = <b>'+esc(A.state.theme.hi)+'</b></span></div></div>';
+  }
+
+  function viewHostLobby(){
+    var meIn=!!findPlayer(myId());
+    var playing=activePlayers().length;
+    function chip(mode,emo,title,sub){ return '<button class="chip '+(A.themeMode===mode?"active":"")+'" data-mode="'+mode+'"><span class="emo">'+emo+'</span><span class="txt">'+title+'<span class="sub">'+sub+'</span></span><span class="tick">\u2713</span></button>'; }
+    return brand()+
+    '<div class="topbar"><button class="link" data-leave>\u00d7 Close room</button>'+statusPill()+'</div>'+
+    '<div class="card">'+
+      '<div class="roomwrap"><div class="rc-eye">Room code</div><div class="roomcode">'+esc(A.room)+'</div>'+
+        '<div class="copyrow"><button class="copybtn" data-copycode>Copy code</button><button class="copybtn" data-copylink>Copy join link</button></div>'+
+      '</div>'+
+      '<div class="modelabel">Players'+(A.state.players.length?" ("+A.state.players.length+")":"")+'</div>'+
+      '<div class="roster">'+rosterRows(true)+'</div>'+
+      (meIn?'<div class="stack" style="margin-top:11px"><button class="btn soft tiny" data-removeme>Leave the game (just run it)</button></div>'
+           :'<div class="field" style="margin-top:13px"><label>Want a number too? Add yourself</label><input data-hostname maxlength="18" placeholder="Your name" /></div><button class="btn soft tiny" data-addme>+ Add me as a player</button>')+
+      '<div class="modelabel">Round theme</div>'+
+      '<div class="chips">'+chip("builtin","\ud83c\udfb2","Surprise theme","Random scale each round")+chip("custom","\u270d\ufe0f","Type our own","You write the scale")+chip("none","\ud83d\udd22","Numbers only","Just deal secret numbers")+'</div>'+
+      errBlock()+
+      '<div class="note">Tap a \ud83c\udf99\ufe0f to make someone the narrator (guides the round, gets no number). You\u2019re the host \u2014 the numbers run on your phone, so no peeking \ud83d\ude07</div>'+
+      '<div class="stack"><button class="btn big" data-deal '+(playing<2?"disabled":"")+'>Deal secret numbers \u2192</button></div>'+
+    '</div>'+
+    '<div class="foot">'+playing+' player'+(playing===1?"":"s")+' will get a number.</div>';
+  }
+
+  function viewCustomForm(){
+    return brand()+
+    '<div class="topbar"><button class="link" data-backlobby>\u2039 Back</button>'+statusPill()+'</div>'+
+    '<div class="card"><h2 class="section">Write your scale</h2><p class="hint">Everyone answers somewhere between your 1 and your 10.</p>'+
+      '<div class="field"><label>The scenario</label><input data-c="s" maxlength="60" value="'+esc(A.draft.s)+'" placeholder="e.g. How dramatic is your morning" /></div>'+
+      '<div class="field"><label>What a 1 means</label><input data-c="lo" maxlength="40" value="'+esc(A.draft.lo)+'" placeholder="e.g. Barely awake" /></div>'+
+      '<div class="field"><label>What a 10 means</label><input data-c="hi" maxlength="40" value="'+esc(A.draft.hi)+'" placeholder="e.g. A full Broadway show" /></div>'+
+      errBlock()+
+      '<div class="stack"><button class="btn big" data-customdeal>Deal secret numbers \u2192</button></div>'+
+    '</div>';
+  }
+
+  function viewNarrPick(){
+    var rows=A.state.players.map(function(p,i){
+      var sel=p.id===A.state.narratorId;
+      return '<button class="rr" data-pick="'+p.id+'" style="width:100%;text-align:left;border:2px solid '+(sel?"#ffca3a":"transparent")+';background:'+(sel?"#fff6e0":"#f7f4fc")+'">'+
+        '<div class="av" style="background:'+avatar(i)+'">'+esc((p.name||"?").slice(0,1).toUpperCase())+'</div><div class="nm">'+esc(p.name)+'</div>'+(sel?'<span class="tag">narrator</span>':"")+'</button>';
+    }).join("");
+    return brand()+
+    '<div class="topbar"><span></span>'+statusPill()+'</div>'+
+    '<div class="card"><h2 class="section">Round '+((A.state.round||0)+1)+' \u2014 narrator?</h2>'+
+      '<p class="hint">Pick who guides this round (no number), or choose no narrator. Then deal.</p>'+
+      '<div class="roster">'+rows+'</div>'+
+      '<button class="btn soft tiny" data-pick="none" style="margin-top:10px">No narrator this round</button>'+
+      errBlock()+
+      '<div class="stack"><button class="btn big" data-continue>Deal round '+((A.state.round||0)+1)+' \u2192</button></div>'+
+    '</div>';
+  }
+
+  function viewHostDealt(){
+    var meNum=A.state.deal[myId()];
+    var iAmNarr=A.state.narratorId===myId();
+    var mine="";
+    if(findPlayer(myId())){
+      if(iAmNarr) mine='<div class="narrbanner">\ud83c\udf99\ufe0f You\u2019re narrating \u2014 no number</div>';
+      else if(meNum) mine='<div class="themepeek" style="text-align:center"><div class="tp-eye">Your secret number</div><div style="font-family:var(--font-display);font-weight:700;font-size:54px;color:'+NUM_COLORS[meNum]+';line-height:1">'+meNum+'</div></div>';
+    }
+    return brand()+
+    '<div class="topbar"><button class="link" data-leave>\u00d7 Close</button>'+statusPill()+'</div>'+
+    '<div class="glass ready">'+
+      '<div class="party">\ud83c\udf89</div><h2>Round '+A.state.round+' dealt!</h2>'+
+      '<p>Everyone has their number on their own phone. Take turns describing yours, then line up 1\u2192 10.</p>'+
+      mine+ themePeek()+
+      '<div class="modelabel" style="color:var(--text);text-align:left">In this room</div>'+
+      '<div class="roster">'+rosterRows(false)+'</div>'+
+      '<div class="stack">'+
+        '<button class="btn big" data-newround>\u21ba New round</button>'+
+        '<button class="btn aqua" data-reveal>Reveal the order</button>'+
+        '<button class="btn soft" data-backtolobby>Edit players / theme</button>'+
+      '</div>'+
+    '</div>';
+  }
+
+  function viewReveal(isHost){
+    var arr=[];
+    for(var id in A.state.deal){ var p=findPlayer(id); arr.push({name:p?p.name:"?",n:A.state.deal[id]}); }
+    arr.sort(function(a,b){return a.n-b.n;});
+    var rows=arr.map(function(r,k){ return '<div class="rrow" style="animation-delay:'+(k*55)+'ms"><div class="rn" style="background:'+NUM_COLORS[r.n]+'">'+r.n+'</div><div class="rname">'+esc(r.name)+'</div></div>'; }).join("");
+    var nName=A.state.narratorId?(findPlayer(A.state.narratorId)||{}).name:null;
+    return brand()+
+    '<div class="topbar"><button class="link" data-leave>\u00d7 Leave</button>'+statusPill()+'</div>'+
+    '<div class="glass ready"><div class="party">\ud83d\udc40</div><h2>The real order</h2><p>Lowest to highest \u2014 did you get it right?</p>'+
+      '<div class="resultlist">'+rows+'</div>'+
+      (nName?'<div class="narrbanner" style="margin-top:12px">\ud83c\udf99\ufe0f '+esc(nName)+' narrated</div>':"")+
+      (isHost?'<div class="stack"><button class="btn big" data-newround>\u21ba New round</button><button class="btn soft" data-backtolobby>Edit players / theme</button></div>'
+             :'<div class="foot" style="margin-top:14px">Waiting for the host to start the next round\u2026</div>')+
+    '</div>';
+  }
+
+  function viewPlayer(){
+    var me=findPlayer(myId());
+    // not yet registered
+    if(!me){
+      return brand()+'<div class="topbar"><button class="link" data-leave>\u2039 Leave</button>'+statusPill()+'</div>'+
+        '<div class="glass waitbox"><div class="spin"></div><h2>Joining as '+esc(A.myName)+'\u2026</h2><p>Waiting for the host to see you. Make sure the host\u2019s phone is on this room.</p></div>';
+    }
+    // lobby / waiting
+    if(A.state.phase==="lobby" || (A.state.phase==="dealt" && A.state.narratorId!==myId() && !A.state.deal[myId()])){
+      var waitMsg=A.state.phase==="lobby"?"Waiting for the host to deal\u2026":"You joined mid-round \u2014 you\u2019re in for the next one.";
+      return brand()+'<div class="topbar"><button class="link" data-leave>\u2039 Leave</button>'+statusPill()+'</div>'+
+        '<div class="glass waitbox">'+
+          '<div style="font-size:40px">\u2705</div><h2>You\u2019re in, '+esc(me.name)+'!</h2>'+
+          '<p>'+waitMsg+'</p>'+
+          '<div class="field" style="text-align:left;margin-top:16px"><label style="color:var(--text)">Change your name</label><input data-pname maxlength="18" value="'+esc(me.name)+'" /></div>'+
+          '<button class="btn soft tiny" data-rename>Update name</button>'+
+          '<div class="foot" style="margin-top:14px">'+A.state.players.length+' in the room</div>'+
+        '</div>';
+    }
+    // narrator
+    if(A.state.narratorId===myId()){
+      return brand()+'<div class="topbar"><button class="link" data-leave>\u2039 Leave</button>'+statusPill()+'</div>'+
+        '<div class="reveal"><div class="numcard narrcard"><div class="crown">\ud83c\udf99\ufe0f</div><div class="who">'+esc(me.name)+', you\u2019re the narrator</div><div class="scale-tag" style="margin-top:8px">Read the scale aloud and guide the round. You don\u2019t get a number.</div></div>'+
+        themePeek()+'</div>';
+    }
+    // has a number
+    var n=A.state.deal[myId()];
+    var is10=n===10; var col=NUM_COLORS[n];
+    var tag="Keep it secret!";
+    if(A.state.theme){ if(n<=3)tag="Toward: "+A.state.theme.lo; else if(n>=8)tag="Toward: "+A.state.theme.hi; else tag="Right in the middle"; }
+    return brand()+'<div class="topbar"><button class="link" data-leave>\u2039 Leave</button>'+statusPill()+'</div>'+
+      '<div class="reveal">'+
+        '<div class="numcard '+(is10?"is10":"")+'" style="background:linear-gradient(160deg,'+col+','+shade(col)+')">'+(is10?'<div class="crown">\ud83d\udc51</div>':"")+
+          '<div class="who">'+esc(me.name)+', your number is</div><div class="big">'+n+'</div><div class="scale-tag">'+esc(tag)+'</div></div>'+
+        themePeek()+
+        '<div class="revealhint">Only you can see this. Describe it out loud on the scale \u2014 don\u2019t say the number!</div>'+
+      '</div>';
+  }
+
+  function shade(hex){ var c=hex.replace("#",""); var r=Math.round(parseInt(c.substr(0,2),16)*.72),g=Math.round(parseInt(c.substr(2,2),16)*.72),b=Math.round(parseInt(c.substr(4,2),16)*.72); return "#"+[r,g,b].map(function(x){return ("0"+x.toString(16)).slice(-2);}).join(""); }
+
+  // ============ EVENTS ============
+  app.addEventListener("click",function(e){
+    var t=e.target.closest("button"); if(!t) return;
+    var has=function(a){return t.hasAttribute(a);};
+
+    // landing / join
+    if(has("data-create")){ A.err=""; hostCreate(); return; }
+    if(has("data-join")){ A.err=""; A.screen="joinform"; render(); return; }
+    if(has("data-resume")){ var s=loadSession(); if(s){ if(s.role==="host"){ A.role="host";A.room=s.room;A.state=null;A.brokerIdx=0;A.everConnected=false; location.hash=s.room; connect(); } else { playerJoin(s.room,s.name||"Player"); } } return; }
+    if(has("data-landing")){ A.screen="landing"; A.err=""; render(); return; }
+    if(has("data-leave")){ leaveAll(); return; }
+    if(has("data-dojoin")){
+      var rc=(app.querySelector('[data-f="room"]')||{}).value||""; var nm=(app.querySelector('[data-f="name"]')||{}).value||"";
+      rc=rc.trim().toUpperCase(); nm=nm.trim();
+      if(rc.length<3){ A.err="Enter the room code."; render(); return; }
+      if(!nm){ A.err="Enter your name."; render(); return; }
+      A.err=""; playerJoin(rc,nm); return;
+    }
+
+    // host lobby
+    if(has("data-copycode")){ copyCode(); return; }
+    if(has("data-copylink")){ copyLink(); return; }
+    if(has("data-mode")){ A.themeMode=t.getAttribute("data-mode"); A.err=""; render(); return; }
+    if(has("data-narr")){ var id=t.getAttribute("data-narr"); A.state.narratorId=(A.state.narratorId===id)?null:id; A.err=""; publishState(); return; }
+    if(has("data-remove")){ var rid=t.getAttribute("data-remove"); A.state.players=A.state.players.filter(function(p){return p.id!==rid;}); if(A.state.narratorId===rid)A.state.narratorId=null; publishState(); return; }
+    if(has("data-addme")){ var hn=(app.querySelector("[data-hostname]")||{}).value||""; hn=hn.trim()||"Me"; if(!findPlayer(myId()))A.state.players.push({id:myId(),name:hn}); publishState(); return; }
+    if(has("data-removeme")){ A.state.players=A.state.players.filter(function(p){return p.id!==myId();}); if(A.state.narratorId===myId())A.state.narratorId=null; publishState(); return; }
+    if(has("data-deal")){ hostDeal(); return; }
+
+    // custom form
+    if(has("data-backlobby")){ A.err=""; A.screen="host"; render(); return; }
+    if(has("data-customdeal")){
+      var d=A.draft; if(!d.s.trim()){ A.err="Give your scale a scenario."; render(); return; }
+      A.state.theme={s:d.s.trim(),lo:(d.lo.trim()||"the low end"),hi:(d.hi.trim()||"the high end")}; A.err=""; finalizeDeal(); return;
+    }
+
+    // dealt / reveal
+    if(has("data-newround")){ A.screen="narrpick"; A.err=""; render(); return; }
+    if(has("data-reveal")){ A.state.phase="reveal"; publishState(); return; }
+    if(has("data-backtolobby")){ A.state.phase="lobby"; A.state.deal={}; A.screen="host"; publishState(); return; }
+
+    // narrpick
+    if(has("data-pick")){ var pid=t.getAttribute("data-pick"); A.state.narratorId=(pid==="none")?null:pid; render(); return; }
+    if(has("data-continue")){ hostDeal(); return; }
+
+    // player
+    if(has("data-rename")||has("data-updatename")){ var pv=(app.querySelector("[data-pname]")||{}).value||""; pv=pv.trim(); if(pv){ A.myName=pv; var sess=loadSession(); if(sess){sess.name=pv;saveSession(sess);} sendEv({t:"rename",id:myId(),name:pv}); toast("Name updated"); } return; }
+  });
+
+  app.addEventListener("input",function(e){
+    var t=e.target;
+    if(t.hasAttribute("data-c")){ A.draft[t.getAttribute("data-c")]=t.value; }
+  });
+
+  // ---------- boot ----------
+  window.addEventListener("hashchange",function(){ if(A.role===null){ var h=(location.hash||"").replace("#","").toUpperCase(); if(h){ A.joinRoom=h; A.screen="joinform"; render(); } } });
+  (function boot(){
+    var h=(location.hash||"").replace("#","").toUpperCase();
+    var sess=loadSession();
+    if(h && (!sess || sess.role!=="host")){ A.joinRoom=h; A.screen="joinform"; }
+    else { A.screen="landing"; }
+    render();
+  })();
+})();
+</script>
+</body>
+</html>
